@@ -1,0 +1,124 @@
+
+# if screen active
+screen -S p4switch
+#else
+screen -r p4switch
+#build P4
+~/tools/p4_build.sh switch.p4 P4PPFLAGS="-DHDR_20B -DRND_HEADER -DSAME_10HDR -DCASE_10ST"
+~/tools/p4_build.sh switch.p4 P4PPFLAGS="-DCASE_INCREMENTAL -DCASE_9ST -DEND_7TH -DHDR_1B -DHDR_2B -DHDR_4B -DHDR_8B -DHDR_16B -DHDR_32B -DHDR_64B -DHDR_128B -DHDR_256B"
+# run P4 (first switch)
+cd APS-One-touch/
+python3 InstallAPS.py -> n,n,r
+(maybe sudo pass)
+
+#BoomRPC
+
+1) 
+
+type = sal_services.SwitchService.StartGearBox
+dest = 10.98.1.156:50054
+payload = {}
+
+2) 
+# Gen to first switch 10G
+type = sal_services.SwitchService.AddPort
+dest = 10.98.1.156:50054
+# speed = 5 is 10G
+payload = {
+  "portId": {
+    "portNum": 2,
+    "lane": 0
+  },
+  "portConf": {
+    "speed": 5,
+    "fec": 1,
+    "an": 1,
+    "fc": 0,
+    "enable": 1,
+    "up": 1
+  }
+}
+
+3) 
+# Gen to first switch 100G 
+type = sal_services.SwitchService.AddPort
+dest = 10.98.1.156:50054
+# speed = 9 is 100G
+payload = {
+  "portId": {
+    "portNum": 50,
+    "lane": 0
+  },
+  "portConf": {
+    "speed": 9,
+    "fec": 1,
+    "an": 1,
+    "fc": 0,
+    "enable": 1,
+    "up": 1
+  }
+}
+
+3) 
+# First to second switch 100G
+type = sal_services.SwitchService.AddPort
+dest = 10.98.1.156:50054
+# speed = 9 is 100G
+payload = {
+  "portId": {
+    "portNum": 48,
+    "lane": 0
+  },
+  "portConf": {
+    "speed": 9,
+    "fec": 1,
+    "an": 1,
+    "fc": 0,
+    "enable": 1,
+    "up": 1
+  }
+}
+
+
+# Swich descarter
+
+$ run_bfshell.sh
+> ucli
+> pm show
+
+5/0  | 2/0| 44|0/44| 10G  |NONE|YES|ENB|DWN|  NONE  |               0|               0|
+5/1  | 2/1| 45|0/45| 10G  |NONE|NO |ENB|DWN|  NONE  |               0|               0|
+5/2  | 2/2| 46|0/46| 10G  |NONE|YES|ENB|UP |  NONE  |              20|       233874918|
+5/3  | 2/3| 47|0/47| 10G  |NONE|NO |ENB|DWN|  NONE  |               0|               0|
+13/0 |20/0|156|3/28| 100G |NONE|YES|ENB|UP |  NONE  |      2337144773|               0|*
+21/0 |32/0| 64|0/64| 10G  |NONE|YES|ENB|UP |  NONE  |               0|               0|
+21/1 |32/1| 65|0/65| 10G  |NONE|YES|ENB|UP |  NONE  |               0|               0|
+21/2 |32/2| 66|0/66| 10G  |NONE|YES|ENB|UP |  NONE  |         1094917|               0|
+21/3 |32/3| 67|0/67| 10G  |NONE|YES|ENB|UP |  NONE  |         1094917|               0|
+
+
+
+# Collector
+./main -p 54321 -r ~/Tofino_P4rformance/UDPServer/Golang/results/test4_inc_dec/inc_doubling \
+-f 9.5g_10_100M_1404Byte_p-eth-INCRx7H
+
+
+
+# stats de unos tests
+
+python3 ~/Tofino_P4rformance/code/parser/test_scripts/stats.py \
+/home/ederi2t/Tofino_P4rformance/UDPServer/Golang/results/test4_inc_dec/
+
+#Activar wireshark
+sudo xauth add $(xauth -f .Xauthority list|tail -1)
+
+
+#rules
+
+bfrt_python
+bfrt.switch.pipe.Ingress
+
+
+#rule generation
+python3.7 ../../test_scripts/gen_cp_rules.py lpm 8 7 1000 10 1 ../../test_scripts/rules
+

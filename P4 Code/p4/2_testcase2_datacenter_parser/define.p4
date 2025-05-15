@@ -1,0 +1,1 @@
+#define MPLS_STACK_SIZE 4
