@@ -1,0 +1,95 @@
+### Installation of Ubuntu Server 16.04
+
+Follow steps in section "Installation of Ubuntu server" of the manual
+
+### Installation of SDE y BSP
+
+Follow steps in section "Installation of the SDE and BSP" of the manual, using the corresponding names for the SDE and BSP files. The ones provided in this repository are bf-sde-9.0.0.tgz and BF2556X-1T_BSP_9.0.0-master.zip. The manual is for version 8.9.0 but it has been tested with 9.0.0 and the steps are the same besides the filenames.
+
+### Setup the switching functions
+
+Steps in bold need to be ran after each reboot.
+
+- download from this repository and untar irq_debug.tgz, then cd to the irq_debug directory
+- **`sudo insmod ./irq_debug.ko`** (if it fails, edit irq_debug.c to remove the #include <linux/sched/signal.h> line and try again)
+- **`sudo modprobe i2c-dev`**
+- **`sudo i2c-i801`**
+- download from this repository and untar mv_pipe_config.tgz, then cd to the mv_pipe_config directory
+- `gcc mv_pipe_config.c -o mv_pipe_config`
+- `sudo mkdir /delta/`
+- `sudo cp ./mv_pipe_config /delta`
+
+### Compile P4 program
+
+Run `~/tools/p4_build.sh <p4program>.p4` to compile a P4 program. tools.tar.gz is provided in this repository, so it needs to be downloaded, untar, and then the tools/ directory placed in the home directory.
+
+### Start SDE drivers
+
+Steps in bold need to be ran after each reboot.
+
+- **`. ./set_sde.bash`**
+- **`sudo $SDE_INSTALL/bin/bf_kdrv_mod_load $SDE_INSTALL`**
+- **Start the switch with the compiled P4 program: `./run_switchd.sh -p <p4program>`. If it goes well, the bf-shell> prompt will be shown.**
+
+### Start switch ports
+
+Some commands to start/enable/stop/show the switch ports.
+
+```
+bf_shell> ucli
+bf_sde> pm
+bf_sde.pm> help
+bf_sde.pm> port-add <port/s> <speed> <NONE/RS>
+bf_sde.pm> port-enb <port/s>
+bf_sde.pm> port-del <port/s>
+bf_sde.pm> show
+bf_sde.pm> ..
+bf_sde> exit
+bf_shell>
+```
+
+- \<port/s\> can be N/M, N/- (for N/0, N/1, N/2 and N/3), or -/- (for all)
+- \<speed\> can be 1G, 10G, 25G, 40G, 50G, 100G.
+ - Ports 1/0 through 4/3 (1-16) support 1G/10G/25G
+ - Ports 5/0 through 12/3 (17-48) support 10G/25G/40G
+ - Ports 13/- through 20/- (49-56) support 40G/50G/100G
+
+##### Start ports between 5/- and 12/- at 10G
+
+Execute `./run_switchd.sh -p <p4program>`
+Then, in the shell that appears:
+```
+bf_shell> ucli
+bf_sde> pm
+bf_sde.pm> port-add 5/- 10G NONE
+bf_sde.pm> port-enb 5/-
+bf_sde.pm> an-set 5/- 1
+bf_sde.pm> show
+```
+The OPR columns show say "UP" port the ports that have been enabled (for example 5/0, 5/1, 5/2, 5/3 for 5/-), and the LEDs in the switch turned on (assuming a link is connected to those ports).
+
+Then use the bfrt shell to populate the program tables.
+
+##### Start ports between 1/- and 4/- at 1G
+
+```
+export BSP=`pwd`
+export BSP_INSTALL=$SDE_INSTALL
+./startup_switch_bf2556x.sh -g 1 <p4program>
+cd $SDE
+./run_bfshell.sh
+```
+
+### Control plane
+
+To access the python shell to install and see control plane entries.
+
+```
+bf_shell> bfrt_python
+bfrt_python> bfrt.<p4program>.pipe.Ingress.<table>
+> ?
+> <action>
+```
+CPU ports are 21/0 and 21/1
+
+Note: when using port numbers for control plane entries and in P4 programs, use the port number shown in the P_T column of the `bf_sde.pm> show` output for the desired port.
